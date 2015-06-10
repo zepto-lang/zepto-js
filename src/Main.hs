@@ -27,7 +27,7 @@ printUsage = do printVersion
 printVersion :: IO ()
 printVersion = putStrLn ("zepto Version "
                         ++ versionStr
-                        ++ "(zepto-js 0.1.0), "
+                        ++ "(zepto-js 0.1.1), "
                         ++ "compiled with GHC version "
                         ++ show (__GLASGOW_HASKELL__::Integer))
 

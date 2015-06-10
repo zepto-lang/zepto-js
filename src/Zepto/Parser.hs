@@ -241,6 +241,11 @@ parseListComp = do _    <- char '['
                         return $ ListComprehension ret el exr Nothing
     where parseListBody = parseExpr
 
+parseJs :: Parser LispVal
+parseJs = do _ <- string "[js|"
+             x <- manyTill anyChar (try $ string "|]")
+             return $ List [Atom "js", String x]
+
 parseExpr :: Parser LispVal
 parseExpr = parseComments
         <|> parseNumber
@@ -259,6 +264,7 @@ parseExpr = parseComments
         <|> parseQuasiquoted
         <|> parseUnquoted
         <|> parseChar
+        <|> try parseJs
         <|> do _ <- char '('
                x <- try parseList <|> parseDottedList
                _ <- char ')'
