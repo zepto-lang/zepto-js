@@ -2,6 +2,8 @@ Name:                zepto-js
 Version:             0.1.0
 Synopsis:            R5RS and beyond Interpreter and REPL.
 Description:         
+  zepto-js is a Javascript port of zepto using GHCJS.
+  .
   zepto is a relaxed implementation of the R<sup>5</sup>RS standard.
   Implemented features include but are not limited to
   macros, continuations and the datatypes and libraries
