@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, JavaScriptFFI, QuasiQuotes, Rank2Types #-}
 module Zepto.Primitives.IOPrimitives where
 import Control.Monad (liftM)
 import Control.Monad.Except (liftIO, throwError)
@@ -8,6 +9,8 @@ import System.IO.Error (tryIOError)
 import System.Process (system)
 
 import Zepto.Types
+
+import GHCJS.Foreign.QQ
 
 escapeProc :: [LispVal] -> IOThrowsError LispVal
 escapeProc [Number (NumI n)] = writeProc print' [String $ "\x1b[" ++ show n ++ "m"]
@@ -35,6 +38,11 @@ colorProc [Atom (':' : s)] =
                    ]
 colorProc [badArg] = throwError $ TypeMismatch "atom" badArg
 colorProc badArgs = throwError $ NumArgs 1 badArgs
+
+jsProc :: [LispVal] -> IOThrowsError LispVal
+jsProc [String s] = (liftIO [js_| eval(`s); |]) >> return (Bool True)
+jsProc [badArg] = throwError $ TypeMismatch "string" badArg
+jsProc badArgs = throwError $ NumArgs 1 badArgs
 
 makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
 makePort mode [String filename] = liftM Port $ liftIO $ openFile filename mode

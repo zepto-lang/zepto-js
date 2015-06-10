@@ -158,6 +158,7 @@ ioPrimitives = [ ("open-input-file", makePort ReadMode, "open a file for reading
                , ("system", systemProc, "call a system command")
                , ("escape-sequence", escapeProc, "send escape sequence to shell")
                , ("color", colorProc, "colorize output")
+               , ("js", jsProc, "eval JS")
                ]
 
 evalPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal, String)]
