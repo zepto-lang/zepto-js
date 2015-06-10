@@ -1,0 +1,678 @@
+(define-syntax let
+    (syntax-rules ()
+        ((_ ((x v) ...) e1 e2 ...)
+            ((lambda (x ...) e1 e2 ...) v ...))
+        ((_ name ((x v) ...) e1 e2 ...)
+            (let*
+                ((f (lambda (name)
+                    (lambda (x ...) e1 e2 ...)))
+                (ff ((lambda (proc) (f (lambda (x ...) ((proc proc)
+                        x ...))))
+                    (lambda (proc) (f (lambda (x ...) ((proc proc)
+                        x ...)))))))
+                (ff v ...)))))
+
+(define-syntax let*
+    (syntax-rules ()
+       ((let* () body1 body2 ...)
+        (let () body1 body2 ...))
+       ((let* ((name1 val1) (name2 val2) ...)
+          body1 body2 ...)
+        (let ((name1 val1))
+          (let* ((name2 val2) ...)
+            body1 body2 ...)))))
+
+(define-syntax letrec
+  (syntax-rules ()
+                ((letrec ((var1 init1) ...) body ...)
+                 (letrec
+                   (var1 ...)
+                   ()
+                   ((var1 init1) ...)
+                   body ...))
+                ((letrec
+                   ()
+                   (temp1 ...)
+                   ((var1 init1) ...)
+                   body ...)
+                 (let ((var1 #f) ...)
+                   (let ((temp1 init1) ...)
+                     (set! var1 temp1)
+                     ...
+                     body ...)))
+                ((letrec
+                   (x y ...)
+                   (temp ...)
+                   ((var1 init1) ...)
+                   body ...)
+                 (letrec
+                   (y ...)
+                   (newtemp temp ...)
+                   ((var1 init1) ...)
+                   body ...))))
+
+(define-syntax do
+  (syntax-rules ()
+    ((_ ((var init . step) ...)
+        (test expr ...)
+      command ...)
+      (let loop ((var init) ...)
+        (if test
+          (begin expr ...)
+          (begin (begin command ...)
+            (loop
+              (if (null? (cdr (list var . step)))
+                  (car (list var . step))
+                  (cadr (list var . step))) ...)))))))
+(define (char-cmp? cmp a b) "compares two chars with a compare option cmp"
+     (cmp (char->integer a) (char->integer b)))
+
+(define (char-ci-cmp? cmp a b) "compares two chars case insensitive with a compare option cmp"
+     (cmp (char->integer (char-lower-case a)) (char->integer (char-lower-case b)))) 
+
+(define (char=? a b) "are chars equal" (char-cmp? = a b))
+(define (char<? a b) "is char less than" (char-cmp? < a b))
+(define (char>? a b) "is char greater than" (char-cmp? > a b))
+(define (char<=? a b) "is char less than or equal to" (char-cmp? <= a b))
+(define (char>=? a b) "is char greater than or equal to" (char-cmp? >= a b))
+(define (char/=? a b) "is char not equal to" (char-cmp? /= a b))
+
+(define (char-ci=? a b) "are chars equal; case insensitive" 
+  (char-ci-cmp? = a b))
+(define (char-ci<? a b) "is char less than; case insensitive" 
+  (char-ci-cmp? < a b))
+(define (char-ci>? a b) "is char greater than; case insensitive" 
+  (char-ci-cmp? > a b))
+(define (char-ci<=? a b) "is char less than or equal to; case insensitive" 
+  (char-ci-cmp? <= a b))
+(define (char-ci>=? a b) "is char greater than or equal to; case insensitive" 
+  (char-ci-cmp? >= a b))
+(define (char-ci/=? a b) "is char not equal to; case insensitive" 
+  (char-ci-cmp? /= a b))
+(define-syntax cond
+    (syntax-rules (else =>)
+        ((cond (else result1 result2 ...))
+         ((lambda () result1 result2 ...))) 
+        ((cond (test => result))
+         (let ((temp test))
+           (if temp (result temp))))
+        ((cond (test => result) clause1 clause2 ...)
+         (let ((temp test))
+           (if temp
+             (result temp)
+             (cond clause1 clause2 ...))))
+        ((cond (test)) test)
+        ((cond (test) clause1 clause2 ...)
+         (let ((temp test))
+           (if temp
+             temp
+             (cond clause1 clause2 ...))))
+        ((cond (test result1 result2 ...))
+         (if test ((lambda () result1 result2 ...)))) 
+        ((cond (test result1 result2 ...)
+               clause1 clause2 ...)
+         (if test
+           ((lambda () result1 result2 ...)) 
+           (cond clause1 clause2 ...)))))
+
+(define-syntax case
+  (syntax-rules (else =>)
+                ((case (key ...)
+                   clauses ...)
+                 (let ((atom-key (key ...)))
+                   (case atom-key clauses ...)))
+                ((case key
+                   (else => result))
+                 (result key))
+                ((case key
+                   (else result1 result2 ...))
+                 (if #t ((lambda () result1 result2 ...)))) 
+                ((case key
+                   ((atoms ...) result1 result2 ...))
+                 (if (memv key '(atoms ...))
+                   ((lambda () result1 result2 ...)))) 
+                ((case key
+                   ((atoms ...) => result)
+                   clause clauses ...)
+                 (if (memv key '(atoms ...))
+                   (result key)
+                   (case key clause clauses ...)))
+                ((case key
+                   ((atoms ...) result1 result2 ...)
+                   clause clauses ...)
+                 (if (memv key '(atoms ...))
+                   ((lambda () result1 result2 ...)) 
+                   (case key clause clauses ...)))))
+
+(define-syntax when
+  (syntax-rules ()
+                ((when test result1 result2 ...)
+                 (if test
+                   (begin result1 result2 ...)))))
+
+(define-syntax letrec*
+  (syntax-rules ()
+                ((letrec* ((var1 init1) ...) body1 body2 ...)
+                 (let ((var1 #f) ...)
+                   (set! var1 init1)
+                   ...
+                   (let () body1 body2 ...)))))
+
+(define-syntax unless
+  (syntax-rules ()
+                ((unless test result1 ...)
+                 (if (not test)
+                   result1
+                   ...))))
+
+(define-syntax for
+  (syntax-rules ()
+                ((for num action)
+                 (do ((i 0 (+ i 1))) ((= i num)) action))))
+(define force
+    (lambda (object)
+        (object)))
+
+(define-syntax delay
+    (syntax-rules ()
+        ((delay expression)
+            (make-promise (lambda () expression)))))
+
+(define make-promise
+    (lambda (proc)
+        (let ((result-ready? #f)
+                (result #f))
+            (lambda ()
+                (if result-ready?
+                    result
+                (let ((x (proc)))
+                    (if result-ready?
+                        result
+                    (begin (set! result x)
+                        (set! result-ready? #t)
+                            result))))))))
+(define (read? x) "read from a file if it is an input file, else return #f"
+  (if (input-port? x)
+    (read x)
+    #f))
+
+(define (write? x s) "write s to a file if it is an output file, else return #f"
+  (if (output-port? x)
+    (write x s)
+    #f))
+
+(define (call-with-input-file s p) "open an input file s and apply a function to it, then close the file"
+     (let ((inport (open-input-file s)))
+          (if (eq? inport #f)
+               #f
+               (let ((res (p inport)))
+                    (close-input-port inport)
+                    res))))
+
+(define (call-with-output-file s p) "open an output file s and apply a function to it, then close the file"
+     (let ((outport (open-output-file s)))
+          (if (eq? outport #f)
+               #f
+               (let ((res (p outport)))
+                    (close-output-port outport)
+                    res))))
+
+(define (with-input-from-file s p) "open an input file s and run a function while it's open"
+     (let ((inport (open-input-file s)))
+          (if (eq? inport #f)
+               #f
+               (let ((prev-inport (current-input-port)))
+                    (set-input-port inport)
+                    (let ((res (p)))
+                         (close-input-port inport)
+                         (set-input-port prev-inport)
+                         res)))))
+
+(define (with-output-to-file s p) "open an output file s and run a function while it's open"
+     (let ((outport (open-output-file s)))
+          (if (eq? outport #f)
+               #f
+               (let ((prev-outport (current-output-port)))
+                    (set-output-port outport)
+                    (let ((res (p)))
+                         (close-output-port outport)
+                         (set-output-port prev-outport)
+                         res)))))
+
+(define (and . lst) "logical and on multiple values" (fold && #t lst))
+(define (or . lst) "logical or on multiple values" (fold || #f lst))
+(define (nor . lst) "logical nor on multiple values" (fold (lambda (x y) (&& (not y) x))  #t lst))
+
+(define (not x) "logical not" (if x #f #t))
+
+(define (ipow b e)
+  (cond ((zero? e) 1)
+        ((even? e) (ipow (* b b) (/ e 2)))
+        (else (* b (ipow (* b b) (/ (- e 1) 2))))))
+
+(define (logand a b)
+  (if (or (zero? a) (zero? b)) 0
+    (+ (* (logand (floor (/ a 2)) (floor (/ b 2))) 2)
+       (if (or (even? a) (even? b)) 0 1))))
+
+(define (logxor a b)
+  (cond ((zero? a) b)
+        ((zero? b) a)
+        (else
+         (+ (* (logxor (floor (/ a 2)) (floor (/ b 2))) 2)
+            (if (even? a)
+                (if (even? b) 0 1)
+                (if (even? b) 1 0))))))
+
+(define (ash int cnt)
+  (if (negative? cnt)
+      (let ((n (ipow 2 (- cnt))))
+        (if (negative? int)
+            (+ -1 (quotient (+ 1 int) n))
+            (quotient int n)))
+      (* (ipow 2 cnt) int)))
+
+(define mwc #f)
+(define shr3 #f)
+(define cong #f)
+(define fib #f)
+(define kiss #f)
+(define lfib4 #f)
+(define swb #f)
+(define uni #f)
+(define vni #f)
+(define settable #f)
+
+(let ((z 362436069) (w 521288629) (jsr 123456789)
+      (jcong 380116160) (a 224466889) (b 7584631)
+      (t (make-vector 256 0)) (x 0) (y 0) (c 0))
+
+  (define (mod8 n) (modulo n 256))
+  (define (mod32 n) (modulo n 4294967296))
+  (define (ref i) (vector-ref t (mod8 i)))
+
+  (set! mwc (lambda ()
+    (set! z (mod32 (+ (* 36969 (logand z 65535)) (ash z -16))))
+    (set! w (mod32 (+ (* 18000 (logand w 65535)) (ash w -16))))
+    (mod32 (+ (ash z 16) w))))
+
+  (set! shr3 (lambda ()
+    (set! jsr (mod32 (logxor jsr (ash jsr 17))))
+    (set! jsr (mod32 (logxor jsr (ash jsr -13))))
+    (set! jsr (mod32 (logxor jsr (ash jsr 5)))) jsr))
+
+  (set! cong (lambda ()
+    (set! jcong (mod32 (+ (* 69069 jcong) 1234567))) jcong))
+
+  (set! fib (lambda ()
+    (set! b (mod32 (+ a b))) (set! a (mod32 (- b a))) a))
+
+  (set! kiss (lambda ()
+    (mod32 (+ (logxor (mwc) (cong)) (shr3)))))
+
+  (set! lfib4 (lambda ()
+    (set! c (mod8 (+ c 1)))
+    (vector-set! t c (mod32 (+ (ref c) (ref (+ c 58))
+      (ref (+ c 119)) (ref (+ c 178))))) (ref c)))
+
+  (set! swb (lambda ()
+    (set! c (mod8 (+ c 1)))
+    (let ((bro (if (< x y) 1 0)))
+      (set! x (mod32 (ref (+ c 34))))
+      (set! y (mod32 (+ (ref (+ c 19)) bro)))
+      (vector-set! t c (mod32 (- x y)))
+      (vector-ref t c))))
+
+  (set! uni (lambda ()
+    (* (kiss) 2.328306e-10)))
+
+  (set! vni (lambda ()
+    (* (- (kiss) 2147483648) 4.6566133e-10)))
+
+  (set! settable (lambda (i1 i2 i3 i4 i5 i6)
+    (set! z i1) (set! w i2) (set! jsr i3) (set! jcong i4)
+    (set! a i5) (set! b i6) (set! x 0) (set! y 0) (set! c 0)
+    (do ((i 0 (+ i 1))) ((= i 256))
+      (vector-set! t i (kiss))))))
+
+(define-syntax rng-assert
+  (syntax-rules ()
+    ((rng-assert expr result)
+      (if (not (equal? expr result))
+          (write
+            '("failed assertion: "
+              "expected " result
+              ", returned " expr))
+            (write "test successful.")))))
+
+(define (test-rng)
+  (let ((k 0))
+    (begin 
+    (settable 12345 65435 34221 12345 9983651 95746118)
+    (write "First test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k 1064612766)) (set! k (lfib4)))
+    (write "Second test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k  627749721)) (set! k (swb)))
+    (write "Third test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k 1372460312)) (set! k (kiss)))
+    (write "Fourth test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k 1529210297)) (set! k (cong)))
+    (write "Fifth test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k 2642725982)) (set! k (shr3)))
+    (write "Sixth test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k  904977562)) (set! k (mwc)))
+    (write "Seventh test")
+    (do ((i 0 (+ i 1))) ((= i 1e6) (rng-assert k 3519793928)) (set! k (fib))))))
+(define exact? integer?)
+(define pi 245850922/78256779)
+(define e 438351041/161260336)
+(define (inexact? x) "is inexact number" (and (real? x) (not (integer? x))))
+(define (even? n) "is even" (= (remainder n 2) 0))
+(define (odd? n) "is odd" (not (= (remainder n 2) 0)))
+(define (zero? n) "is zero" (= n 0))
+(define (positive? n) "is positive" (> n 0))
+(define (negative? n) "is negative" (< n 0))
+(define complex? number?)
+(define (/. . l) (foldl (lambda (x y) (/ (exact->inexact x) y)) 1 l))
+(define (abs n) "absolute value of number" (if (>= n 0) n (- n)))
+(define (exact->inexact n) "make inexact number from exact" (* n 1.0))
+(define (integer->float n) "make float from integer" (* n 1.0))
+(define (<> n1 n2) "not equal" (not (= n1 n2)))
+
+(define (succ x) "next number" (+ x 1))
+
+(define (pred x) "previous number" (- x 1))
+
+(define (gcd a b) "Greatest Common Divisor"
+  (let ((aa (abs a))
+    (bb (abs b)))
+     (if (= bb 0)
+          aa
+          (gcd bb (remainder aa bb)))))
+
+(define (lcm a b) "Least Common Multiple"
+     (if (or (= a 0) (= b 0))
+          0
+          (abs (* (quotient a (gcd a b)) b))))
+(define (caar pair) (car (car pair)))
+(define (cadr pair) (car (cdr pair)))
+(define (cdar pair) (cdr (car pair)))
+(define (cddr pair) (cdr (cdr pair)))
+(define (caaar pair) (car (car (car pair))))
+(define (caadr pair) (car (car (cdr pair))))
+(define (cadar pair) (car (cdr (car pair))))
+(define (cdaar pair) (cdr (car (car pair))))
+(define (caddr pair) (car (cdr (cdr pair))))
+(define (cdadr pair) (cdr (car (cdr pair))))
+(define (cddar pair) (cdr (cdr (car pair))))
+(define (cdddr pair) (cdr (cdr (cdr pair))))
+(define (caaaar pair) (car (car (car (car pair)))))
+(define (caaadr pair) (car (car (car (cdr pair)))))
+(define (caadar pair) (car (car (cdr (car pair)))))
+(define (caaddr pair) (car (car (cdr (cdr pair)))))
+(define (cadaar pair) (car (cdr (car (car pair)))))
+(define (cadadr pair) (car (cdr (car (cdr pair)))))
+(define (caddar pair) (car (cdr (cdr (car pair)))))
+(define (cadddr pair) (car (cdr (cdr (cdr pair)))))
+(define (cdaaar pair) (cdr (car (car (car pair)))))
+(define (cdaadr pair) (cdr (car (car (cdr pair)))))
+(define (cdadar pair) (cdr (car (cdr (car pair)))))
+(define (cdaddr pair) (cdr (car (cdr (cdr pair)))))
+(define (cddaar pair) (cdr (cdr (car (car pair)))))
+(define (cddadr pair) (cdr (cdr (car (cdr pair)))))
+(define (cdddar pair) (cdr (cdr (cdr (car pair)))))
+(define (cddddr pair) (cdr (cdr (cdr (cdr pair)))))
+(define random
+  (let ((a 69069) (c 1) (m (expt 2 32)) (seed 19380110.0))
+    (lambda (new-seed)
+      (if (pair? new-seed)
+        (begin (set! seed (car new-seed)))
+        (begin (set! seed (modulo (+ (* seed a) c) m))))
+      (/ seed m))))
+
+(define (randint . args) "generate a random integer between the given args(the lower range is optional)"
+  (cond ((= (length args) 1) (randint 0 (car args)))
+        ((= (length args) 2)
+         (+ (car args) (floor (* (random) (- (cadr args) (car args))))))
+        (else (write "usage: (randint [lo] hi)"))))
+(define (list . objs) "creates a list from objects"
+  objs)
+
+(define (id obj) "returns an object"
+  obj)
+
+(define (flip func) "flips two arguments for a function"
+  (lambda (arg1 arg2)
+    (func arg2 arg1)))
+
+(define (indexed-tail l k) "get tail of a list starting at index"
+    (if (zero? k)
+      l
+      (indexed-tail (cdr l) (- k 1))))
+
+(define (list-ref l k) "get reference to list element at certain point"
+    (car (indexed-tail l k)))
+
+(define (list-tail l) "get tail of a list"
+  (cdr l))
+
+(define (append i a) "append something to a list"
+    (foldr (lambda (ax ix) (cons ax ix)) a i))
+
+(define (curry func arg1) "curry a function"
+  (lambda (arg)
+    (func arg1 arg)))
+
+(define (compose f g) "compose two functions"
+  (lambda (arg)
+    (f (apply g arg))))
+
+(define (foldr func end l) "fold right"
+  (if (null? l)
+    end
+    (func (car l) (foldr func end (cdr l)))))
+
+(define (foldl func accum l) "fold left"
+  (if (null? l)
+    accum
+    (foldl func (func accum (car l)) (cdr l))))
+
+(define (generate func init pred)
+  (if (pred init)
+    (cons init '())
+    (cons init (unfold func (func init) pred))))
+
+(define (sum . l) "sum of values"
+  (fold + 0 l))
+
+(define (product . l) "product of values"
+  (fold * 1 l))
+
+(define (max first . l) "maximum of values"
+  (fold (lambda (old new)
+                (if (> old new) old new))
+        first
+        l))
+
+(define (min first . l) "minimum of values"
+  (fold (lambda (old new)
+          (if (< old new) old new))
+        first
+        l))
+
+(define (length l) "length of list"
+  (fold (lambda (x y)
+                (+ x 1))
+        0
+        l))
+
+(define (reverse l) "reverse list"
+  (fold (flip cons) '() l))
+
+(define (my-mem-helper obj lst cmp-proc)
+    (cond
+        ((null? lst) #f)
+        ((cmp-proc obj (car lst)) lst)
+        (else (my-mem-helper obj (cdr lst) cmp-proc))))
+
+(define (memq obj lst) (my-mem-helper obj lst eq?))
+
+(define (memv obj lst) (my-mem-helper obj lst eqv?))
+
+(define (member obj lst) (my-mem-helper obj lst equal?))
+
+(define (mem-helper pred op) (lambda (acc next) (if (and (not acc) (pred (op next))) next acc)))
+
+(define (assq obj alist) (fold (mem-helper (curry eq? obj) car) #f alist))
+
+(define (assv obj alist) (fold (mem-helper (curry eqv? obj) car) #f alist))
+
+(define (assoc obj alist) (fold (mem-helper (curry equal? obj) car) #f alist))
+
+(define (map func l) "map function to list"
+  (foldr (lambda (x y)
+           (cons (func x) y))
+         '()
+         l))
+
+(define (foreach func l) "apply function to each element on the list"
+  (foldl (lambda (x y)
+           (cons (func x) y))
+         '()
+         l))
+
+(define (filter pred l) "filter list through preidcate"
+  (foldr (lambda (x y)
+           (if (pred x)
+               (cons x y)
+               y))
+         '()
+         l))
+
+(define (any? pred lst) "does anything in the list satisfy the predicate?"
+  (let any* ((l (map pred lst)))
+    (cond
+      ((null? l) #f)
+      ((car l) #t)
+      (else
+        (any* (cdr l))))))
+
+(define (every? pred lst) "do all values in the list satisfy the predicate?"
+  (let every* ((l (map pred lst)))
+    (cond
+      ((null? l) #t)
+      ((car l)
+       (every* (cdr l)))
+      (else
+        #f))))
+
+(define all? every?)
+
+(define (case x . cs) 
+         if (== cs ())
+            ("No Case Found")
+            (if (== x (caar cs))  
+                (cadar cs) 
+                (unpack case (join (list x) (cdr cs)))))
+
+(define (iota n) "makes a list from numbers from 0 to n"
+    (let ((acc '()))
+      (do ((i 0 (+ i 1))) ((= i n)) (set! acc (append acc (list i)))) acc))
+
+(define (unzip1-with-cdr . lists)
+  (unzip1-with-cdr-iterative lists '() '()))
+
+(define (unzip1-with-cdr-iterative lists cars cdrs)
+  (if (null? lists)
+      (cons cars cdrs)
+      (let ((car1 (caar lists))
+        (cdr1 (cdar lists)))
+    (unzip1-with-cdr-iterative 
+     (cdr lists) 
+     (append cars (list car1))
+     (append cdrs (list cdr1))))))
+
+(define (for-each proc . lists) "applies a function to a bunch of arguments"
+  (if (null? lists)
+      (apply proc)
+      (if (null? (car lists))
+      #t
+      (let* ((unz (apply unzip1-with-cdr lists))
+         (cars (car unz))
+         (cdrs (cdr unz)))
+        (apply proc cars) (apply map (cons proc cdrs))))))
+(define (string->integer x) 
+  (let ((num (string->number x)))
+    (cond
+      ((integer? num) num)
+      ((float? num) (round num))
+      ((rational? num) (round num))
+      ((complex? num) (round (real num)))
+      (else #f))))
+
+(define (string->float x) 
+  (let ((num (string->number x)))
+    (cond
+      ((integer? num) (* 1.0 num))
+      ((float? num) num)
+      ((rational? num) (exact->inexact num))
+      ((complex? num) (real num))
+      (else #f))))
+
+(define (string->rational x) 
+  (let ((num (string->number x)))
+    (cond
+      ((integer? num) (/ 2 1/1))
+      ((float? num) (round num))
+      ((rational? num) (round num))
+      ((complex? num) (/ (round (real num)) 1/1))
+      (else #f))))
+
+(define (string->complex x) 
+  (let ((num (string->number x)))
+    (cond
+      ((integer? num) (* num 1+0i))
+      ((float? num) (* num 1+0i))
+      ((rational? num) (* num 1+0i))
+      ((complex? num) num)
+      (else #f))))
+
+(define (string->boolean x)
+  (cond
+    ((string=? x "true") #t)
+    ((string=? x "false") #f)
+    (else :err)))
+(define (in? pred? l) "check whether there is an element in l that matches the predicate pred?"
+  (cond ((null? l) #f)
+  ((pred? (car l)) #t)
+  (else (in? pred? (cdr l)))))
+
+(define (list-index l el) "get index of el in l; otherwise get -1"
+  (if (null? l)
+    -1
+    (if (eq? (car l) el)
+      0
+      (let ((res (list-index (cdr l) el)))
+        (if (= res -1) 
+        -1
+        (+ 1 res))))))
+(define len length)
+(define fold foldl)
+(define reduce fold)
+(define ceil ceiling)
+(define head car)
+(define tail list-tail)
+(define char-downcase char-lower-case)
+(define char-upcase char-upper-case)
+
+(define (ok? x) "is arg ok"
+  (eq? x :ok))
+
+(define (error? x) "is arg error"
+  (eq? x :error))
+
+(define (yes? x) "is arg yes"
+  (eq? x :yes))
+
+(define (no? x) "is arg no"
+  (eq? x :no))

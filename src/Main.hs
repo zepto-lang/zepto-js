@@ -54,9 +54,10 @@ main = do
           printVersion
           printCopyright
           [js_| console.log('Compiling stdlib...'); |]
-          -- stdSrc <- [js| zepto.getStdlib() |]
-          [js_| console.log('stdlib compiled!'); |]
+          stdSrc <- [js| zepto.getStdlib() |]
           env <- primitiveBindings
+          putStrLn =<< evaluation env ("(eval-string \"" ++ stdSrc ++ "\")")
+          [js_| console.log('stdlib compiled!'); |]
           forever $ do
             [jsi_| zepto.waitForChange($c); |]
             threadDelay 500000

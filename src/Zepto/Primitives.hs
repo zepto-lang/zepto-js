@@ -410,6 +410,16 @@ eval _ _ (List [Atom "λ"]) = throwError $ NumArgs 2 []
 eval _ _ (List [Atom "lambda"]) = throwError $ NumArgs 2 []
 eval _ _ (List (Atom "λ" : x)) = throwError $ NumArgs 2 x
 eval _ _ (List (Atom "lambda" : x)) = throwError $ NumArgs 2 x
+eval env conti (List [Atom "eval-string", String s]) = do
+        result <- liftM checkLast . mapM (evl env (nullCont env)) =<< (liftThrows $ readExprList s)
+        contEval env conti result
+    where evl env' cont' val = macroEval env' val >>= eval env' cont'
+          checkLast x = if length x > 1
+                          then last x
+                          else error $
+                                "Parse Error while reading file '"
+                                ++ "from 'eval-string'"
+                                ++ "' - is string not valid?"
 eval _ _ (List [Atom "load"]) = throwError $ NumArgs 1 []
 eval env conti (List [Atom "load", String file]) = do
         filename <- findFile' file
