@@ -7,20 +7,11 @@ function Zepto(editor, res, dbg, stdlib) {
   this.stdlib = document.getElementById(stdlib).stdlibData;
   this.editor = editor;
   var that = this;
-  editor.keyBinding.origOnCommandKey = editor.keyBinding.onCommandKey;
-  editor.keyBinding.onCommandKey = function(e, hashId, keyCode) {
+  editor.getSession().on("change", function() {
     that.changed = true;
     var x;
     while(x = that.waiting.pop()) x();
-    this.origOnCommandKey(e, hashId, keyCode);
-  }
-  editor.keyBinding.origOnTextInput = editor.keyBinding.onTextInput;
-  this.editor.keyBinding.onTextInput = function(t) {
-    that.changed = true;
-    var x;
-    while(x = that.waiting.pop()) x();
-    this.origOnTextInput(t);
-  };
+  });
 }
 
 Zepto.prototype.getStdlib = function() { return this.stdlib; }

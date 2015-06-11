@@ -287,4 +287,4 @@ readExpr = readOrThrow parseExpr
 
 -- | read a list of expressions
 readExprList :: String -> ThrowsError [LispVal]
-readExprList = readOrThrow (endBy parseExpr spaces)
+readExprList s = readOrThrow (endBy parseExpr spaces) $ s ++ " "

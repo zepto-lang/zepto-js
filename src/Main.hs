@@ -27,7 +27,7 @@ printUsage = do printVersion
 printVersion :: IO ()
 printVersion = putStrLn ("zepto Version "
                         ++ versionStr
-                        ++ "(zepto-js 0.1.1), "
+                        ++ "(zepto-js 0.1.2), "
                         ++ "compiled with GHC version "
                         ++ show (__GLASGOW_HASKELL__::Integer))
 
@@ -56,7 +56,7 @@ main = do
           [js_| console.log('Compiling stdlib...'); |]
           stdSrc <- [js| zepto.getStdlib() |]
           env <- primitiveBindings
-          putStrLn =<< evaluation env ("(eval-string \"" ++ stdSrc ++ "\")")
+          putStrLn =<< evaluation env stdSrc
           [js_| console.log('stdlib compiled!'); |]
           forever $ do
             [jsi_| zepto.waitForChange($c); |]
@@ -65,5 +65,5 @@ main = do
             x <- evaluation env a
             [js_| zepto.write(`x); |]
     where
-      evaluation env x = catch (evalString env x) handler
+      evaluation env x = catch (evalStrings env x) handler
       handler msg@(SomeException _) = return $ "Caught error: " ++ show (msg::SomeException)

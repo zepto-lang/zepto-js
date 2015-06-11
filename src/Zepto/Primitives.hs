@@ -4,6 +4,7 @@ module Zepto.Primitives(primitives
                        , eval
                        , versionStr
                        , evalString
+                       , evalStrings
                        ) where
 import Data.Array
 import Data.Maybe
@@ -195,12 +196,19 @@ stringToNumber [String s, Number base] =
 stringToNumber [badType] = throwError $ TypeMismatch "string" badType
 stringToNumber badArgList = throwError $ NumArgs 1 badArgList
 
--- | searches all primitives for a possible completion
 evalString :: Env -> String -> IO String
 evalString env expr =  runIOThrows $ liftM show $
     liftThrows (readExpr expr) >>=
     macroEval env >>=
     eval env (nullCont env)
+
+evalStrings :: Env -> String -> IO String
+evalStrings e x =  runIOThrows $ liftM show $ liftM safeLast $ evl e x
+  where evl env expr = liftThrows (readExprList expr) >>=
+          mapM (\ex -> macroEval env ex >>= eval env (nullCont env))
+        safeLast l = if null l
+                      then String ""
+                      else last l
 
 contEval :: Env -> LispVal -> LispVal -> IOThrowsError LispVal
 contEval _ (Cont (Continuation cEnv cBody cCont Nothing Nothing)) val =
