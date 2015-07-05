@@ -1,4 +1,5 @@
 module Zepto.Types (LispNum(..),
+                    Simple(..),
                     LispVal(..),
                     Continuation(..),
                     LispFun(..),
@@ -9,6 +10,8 @@ module Zepto.Types (LispNum(..),
                     IOThrowsError,
                     showVal,
                     showError,
+                    fromSimple,
+                    toSimple,
                     trapError,
                     extractValue,
                     typeString,
@@ -278,22 +281,27 @@ data LispNum = NumI Integer
              | NumR Rational
              | NumS Int
 
+data Simple = Atom String
+            | Number LispNum
+            | String String
+            | Character Char
+            | Bool Bool
+            | Nil String
+            | SimpleList [Simple]
+    deriving (Eq, Ord)
+
 instance Show LispVal where show = showVal
 -- | a LispVal data type comprising all Lisp data types
-data LispVal = Atom String
+data LispVal = SimpleVal Simple
              | List [LispVal]
              | DottedList [LispVal] LispVal
              | Vector (Array Int LispVal)
-             | Number LispNum
-             | String String
-             | Character Char
-             | Bool Bool
+             | HashMap (Data.Map.Map Simple LispVal)
              | PrimitiveFunc  ([LispVal] -> ThrowsError LispVal)
              | IOFunc  ([LispVal] -> IOThrowsError LispVal)
              | Port Handle
              | Func LispFun
              | EvalFunc ([LispVal] -> IOThrowsError LispVal)
-             | Nil String
              | Pointer { pointerVar :: String, pointerEnv :: Env }
              | Cont Continuation
              | ListComprehension LispVal LispVal LispVal (Maybe LispVal)
@@ -349,14 +357,16 @@ showNum (NumS contents) = show contents ++ "s"
 
 -- | a show function for all LispVals
 showVal :: LispVal -> String
-showVal (String contents) = contents
-showVal (Atom name) = name
-showVal (Bool True) = "#t"
-showVal (Bool False) = "#f"
-showVal (Character c) = show c
-showVal (Number n) = showNum n
+showVal (SimpleVal (String contents)) = contents
+showVal (SimpleVal (Atom name)) = name
+showVal (SimpleVal (Bool True)) = "#t"
+showVal (SimpleVal (Bool False)) = "#f"
+showVal (SimpleVal (Character c)) = show c
+showVal (SimpleVal (Number n)) = showNum n
+showVal (SimpleVal (SimpleList contents)) = "simple(" ++ unwordsList (map SimpleVal contents) ++")"
 showVal (List contents) = "(" ++ unwordsList contents ++")"
 showVal (Vector contents) = "#(" ++ unwordsList (elems contents) ++ ")"
+showVal (HashMap contents) = "#{" ++ unwordsList (Data.Map.elems contents) ++ "}"
 showVal (PrimitiveFunc _) = "<primitive>"
 showVal (IOFunc _) = "<IO primitive>"
 showVal (EvalFunc _) = "<eval primitive>"
@@ -370,7 +380,7 @@ showVal (Func LispFun {params = args, vararg = varargs, body = _, closure = _,
             Just arg -> " . " ++ arg) ++ ") ...)"
 showVal (DottedList h t) = "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
 showVal (Pointer p _) = "<pointer " ++ p ++ ">"
-showVal (Nil _) = "nil"
+showVal (SimpleVal (Nil _)) = "nil"
 showVal (Cont _) = "<continuation>"
 showVal (ListComprehension expr filt _ _) = "<list comprehension: " ++
                                             show expr ++ " : " ++
@@ -407,26 +417,35 @@ showError (ParseErr parseErr) = "Parse error at " ++ show parseErr
 showError (InternalError err) = "Internal error: " ++ err
 showError (Default err) = err
 
+fromSimple :: Simple -> LispVal
+fromSimple x = SimpleVal x
+
+toSimple :: LispVal -> Simple
+toSimple (SimpleVal x) = x
+toSimple _ = Nil ""
+
 typeString :: LispVal -> String
-typeString (Number (NumI _)) = "integer"
-typeString (Number (NumS _)) = "small integer"
-typeString (Number (NumF _)) = "float"
-typeString (Number (NumR _)) = "rational"
-typeString (Number (NumC _)) = "complex"
-typeString (Vector _) = "vector"
-typeString (Bool _) = "boolean"
-typeString (Character _) = "character"
-typeString (String _) = "string"
+typeString (SimpleVal (Number (NumI _))) = "integer"
+typeString (SimpleVal (Number (NumS _))) = "small integer"
+typeString (SimpleVal (Number (NumF _))) = "float"
+typeString (SimpleVal (Number (NumR _))) = "rational"
+typeString (SimpleVal (Number (NumC _))) = "complex"
+typeString (SimpleVal (Bool _)) = "boolean"
+typeString (SimpleVal (Character _)) = "character"
+typeString (SimpleVal (String _)) = "string"
+typeString (SimpleVal (Atom (':' : _))) = "atom"
+typeString (SimpleVal (Atom _)) = "symbol"
+typeString (SimpleVal (Nil _)) = "nil"
+typeString (SimpleVal (SimpleList _)) = "simple list"
 typeString (List _) = "list"
 typeString (DottedList _ _) = "dotted list"
-typeString (Atom (':' : _)) = "atom"
-typeString (Atom _) = "symbol"
+typeString (Vector _) = "vector"
+typeString (HashMap _) = "hashmap"
 typeString (PrimitiveFunc _) = "primitive"
 typeString (IOFunc _) = "io primitive"
 typeString (EvalFunc _) = "eval primitive"
 typeString (Port _) = "port"
 typeString (Func _) = "function"
-typeString (Nil _) = "nil"
 typeString (Pointer _ _) = "pointer"
 typeString (Cont _) = "continuation"
 typeString (ListComprehension _ _ _ _) = "list comprehension"
@@ -452,7 +471,7 @@ nullEnv = do
     return $ Environment Nothing nullb nullp
 
 nullCont :: Env -> LispVal
-nullCont env = Cont $ Continuation env [] (Nil "") Nothing Nothing
+nullCont env = Cont $ Continuation env [] (fromSimple (Nil "")) Nothing Nothing
 
 -- | lift a ThrowsError to an IOThrowsError
 liftThrows :: ThrowsError a -> IOThrowsError a

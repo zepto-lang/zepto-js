@@ -1,4 +1,5 @@
 module Zepto.Parser(readExpr, readExprList) where
+
 import Control.Monad
 import Control.Monad.Except
 import Data.Array
@@ -7,6 +8,7 @@ import Data.Complex
 import Data.Ratio
 import Numeric
 import Text.ParserCombinators.Parsec hiding (spaces)
+import qualified Data.Map
 
 import Zepto.Types
 
@@ -20,7 +22,7 @@ parseString :: Parser LispVal
 parseString = do _ <- char '"'
                  x <- many (parseEscaped <|> noneOf"\"")
                  _ <- char '"'
-                 return $ String x
+                 return $ fromSimple $ String x
 
 parseEscaped :: forall u . GenParser Char u Char
 parseEscaped =  do
@@ -41,7 +43,7 @@ parseAtom = do first <- letter <|> symbol <|> oneOf "."
                let atom = first : rest
                if atom == "."
                    then pzero
-                   else return $ Atom atom
+                   else return $ fromSimple $ Atom atom
 
 parseNumber :: Parser LispVal
 parseNumber = try parseComplex
@@ -57,33 +59,35 @@ parseStandardNum = do num <- try parseReal <|> parseDigital1
                       e <- optionMaybe $ oneOf "eE"
                       case e of
                            Just _ -> do base <- parseDigital1
-                                        return $ expt num base
+                                        case expt num base of
+                                          Just v  -> return v
+                                          Nothing -> fail $ "unexpectedly failed number parse: digit parser likely broken"
                            Nothing -> return num
-                where expt (Number x) (Number y) = Number $ x * convert y
-                      expt _ _ = Nil ""
+                where expt (SimpleVal (Number x)) (SimpleVal (Number y)) = Just $ fromSimple $ Number $ x * convert y
+                      expt _ _ = Nothing
                       convert x = NumF $ 10 ** fromIntegral x
 
 parseComplex :: Parser LispVal
 parseComplex = do
     realParse <- try parseReal <|> parseDigital1
     let realPrt = case realParse of
-                        Number (NumI n) -> fromInteger n
-                        Number (NumF f) -> f
+                        SimpleVal (Number (NumI n)) -> fromInteger n
+                        SimpleVal (Number (NumF f)) -> f
                         _ -> 0
     _ <- char '+'
     imagParse <- try parseReal <|> parseDigital1
     let imagPrt = case imagParse of
-                        Number (NumI n) -> fromInteger n
-                        Number (NumF f) -> f
+                        SimpleVal (Number (NumI n)) -> fromInteger n
+                        SimpleVal (Number (NumF f)) -> f
                         _ -> 0
     _ <- char 'i'
-    return $ Number $ NumC $ realPrt :+ imagPrt
+    return $ fromSimple $ Number $ NumC $ realPrt :+ imagPrt
 
 parseRational :: Parser LispVal
 parseRational = do
     numeratorParse <- parseDigital1
     case numeratorParse of
-        Number (NumI n) -> do
+        SimpleVal (Number (NumI n)) -> do
             _ <- char '/'
             sign <- many (oneOf "-")
             num <- many1 digit
@@ -92,8 +96,8 @@ parseRational = do
                 else do
                     let denominatorParse = read $ sign ++ num
                     if denominatorParse == 0
-                        then return $ Number $ NumI 0
-                        else return $ Number $ NumR $ n % denominatorParse
+                        then return $ fromSimple $ Number $ NumI 0
+                        else return $ fromSimple $ Number $ NumR $ n % denominatorParse
         _ -> pzero
 
 parseReal :: Parser LispVal
@@ -102,35 +106,35 @@ parseReal = do neg <- optionMaybe $ string "-"
                _ <- string "."
                after <- many1 digit
                case neg of
-                    Just _ -> (return . Number . NumF . read) ("-" ++ before ++ "." ++ after)
-                    Nothing -> (return . Number . NumF . read) (before ++ "." ++ after)
+                    Just _ -> (return . fromSimple . Number . NumF . read) ("-" ++ before ++ "." ++ after)
+                    Nothing -> (return . fromSimple . Number . NumF . read) (before ++ "." ++ after)
 
 parseDigital1 :: Parser LispVal
 parseDigital1 = do neg <- optionMaybe $ string "-"
                    x <- many1 digit
                    case neg of
-                      Just _ -> (return . Number . NumI . read) ("-" ++ x)
-                      Nothing -> (return . Number . NumI . read) x
+                      Just _ -> (return . fromSimple . Number . NumI . read) ("-" ++ x)
+                      Nothing -> (return . fromSimple . Number . NumI . read) x
 
 parseDigital2 :: Parser LispVal
 parseDigital2 = do _ <- try $ string "#d"
                    x <- many1 digit
-                   (return . Number . NumI . read) x
+                   (return . fromSimple . Number . NumI . read) x
 
 parseHex :: Parser LispVal
 parseHex = do _ <- try $ string "#x"
               x <- many1 hexDigit
-              return $ Number $ NumI (hex2dig x)
+              return $ fromSimple $ Number $ NumI (hex2dig x)
 
 parseOct :: Parser LispVal
 parseOct = do _ <- try $ string "#o"
               x <- many1 octDigit
-              return $ Number $ NumI (oct2dig x)
+              return $ fromSimple $ Number $ NumI (oct2dig x)
 
 parseBin :: Parser LispVal
 parseBin = do _ <- try $ string "#b"
               x <- many1 (oneOf "10")
-              return $ Number $ NumI (bin2dig x)
+              return $ fromSimple $ Number $ NumI (bin2dig x)
 
 oct2dig :: String -> Integer
 oct2dig x = fst $ head $ readOct x
@@ -158,23 +162,23 @@ parseDottedList = do h <- endBy parseExpr spaces
 parseQuoted :: Parser LispVal
 parseQuoted = do _ <- char '\''
                  x <- parseExpr
-                 return $ List [Atom "quote", x]
+                 return $ List [fromSimple $ Atom "quote", x]
 
 
 parseQuasiquoted :: Parser LispVal
 parseQuasiquoted = do _ <- char '`'
                       x <- parseExpr
-                      return $ List [Atom "quasiquote", x]
+                      return $ List [fromSimple $ Atom "quasiquote", x]
 
 parseUnquoted :: Parser LispVal
 parseUnquoted = do _ <- try (char ',')
                    x <- parseExpr
-                   return $ List [Atom "unquote", x]
+                   return $ List [fromSimple $ Atom "unquote", x]
 
 parseSpliced :: Parser LispVal
 parseSpliced = do _ <- try (string ",@")
                   x <- parseExpr
-                  return $ List [Atom "unquote-splicing", x]
+                  return $ List [fromSimple $ Atom "unquote-splicing", x]
 
 parseVect :: Parser LispVal
 parseVect = do vals <- sepBy parseExpr spaces
@@ -183,10 +187,10 @@ parseVect = do vals <- sepBy parseExpr spaces
 parseBool :: Parser LispVal
 parseBool = do _ <- string "#"
                x <- oneOf "tf"
-               return $ case x of
-                        't' -> Bool True
-                        'f' -> Bool False
-                        _   -> error "This will never happen."
+               case x of
+                 't' -> return $ fromSimple $ Bool True
+                 'f' -> return $ fromSimple $ Bool False
+                 _   -> fail "This will never happen."
 
 parseChar :: Parser LispVal
 parseChar = do
@@ -195,21 +199,24 @@ parseChar = do
   r <- many (letter <|> digit)
   let pchr = c : r
   case pchr of
-    "alarm"     -> return $ Character '\a'
-    "backspace" -> return $ Character '\b'
-    "delete"    -> return $ Character '\DEL'
-    "escape"    -> return $ Character '\ESC'
-    "newline"   -> return $ Character '\n'
-    "null"      -> return $ Character '\0'
-    "return"    -> return $ Character '\n'
-    "space"     -> return $ Character ' '
-    "tab"       -> return $ Character '\t'
-    _ -> case c : r of
-        [ch] -> return $ Character ch
+    "alarm"     -> return $ fromSimple $ Character '\a'
+    "backspace" -> return $ fromSimple $ Character '\b'
+    "delete"    -> return $ fromSimple $ Character '\DEL'
+    "escape"    -> return $ fromSimple $ Character '\ESC'
+    "newline"   -> return $ fromSimple $ Character '\n'
+    "null"      -> return $ fromSimple $ Character '\0'
+    "return"    -> return $ fromSimple $ Character '\n'
+    "space"     -> return $ fromSimple $ Character ' '
+    "tab"       -> return $ fromSimple $ Character '\t'
+    _ -> case pchr of
+        [ch] -> return $ fromSimple $ Character ch
         ('x' : hexs) -> do
             rv <- parseHexScalar hexs
-            return $ Character rv
-        _ -> pzero
+            return $ fromSimple $ Character rv
+        _ -> fail $ "Unable to parse as char: " ++
+                    pchr ++
+                    "; either pass single character (e.g. #\\1) or" ++
+                    " hexadecimal compound (e.g. #\\xf00)"
 
 parseHexScalar :: Monad m => String -> m Char
 parseHexScalar num = do
@@ -221,7 +228,7 @@ parseHexScalar num = do
 parseComments :: Parser LispVal
 parseComments = do _ <- char ';'
                    _ <- many (noneOf "\n")
-                   return $ Nil ""
+                   return $ fromSimple $ Nil ""
 
 parseListComp :: Parser LispVal
 parseListComp = do _    <- char '['
@@ -241,10 +248,29 @@ parseListComp = do _    <- char '['
                         return $ ListComprehension ret el exr Nothing
     where parseListBody = parseExpr
 
+parseHashMap :: Parser LispVal
+parseHashMap = do vals <- sepBy parseExpr spaces
+                  if mod (length vals) 2 /= 0
+                    then fail "Number of keys/vals must be balanced"
+                    else
+                      case construct [] vals of
+                        Right m -> do
+                          case duplicate (map fst m) of
+                            Just d  ->  fail $ "Duplicate key: " ++ show d
+                            Nothing -> return $ HashMap $ Data.Map.fromList m
+                        Left x  -> fail $ "All values must be simple (offending clause: " ++ show x ++ ")"
+    where construct :: [(Simple, LispVal)] -> [LispVal] -> Either LispVal [(Simple, LispVal)]
+          construct acc [] = Right acc
+          construct acc ((SimpleVal a) : b : l) = construct ((a, b) : acc) l
+          construct _ (x : _) = Left x
+          duplicate :: [Simple] -> Maybe LispVal
+          duplicate [] = Nothing
+          duplicate (x:xs) = if elem x xs then Just (fromSimple x) else duplicate xs
+
 parseJs :: Parser LispVal
 parseJs = do _ <- string "[js|"
              x <- manyTill anyChar (try $ string "|]")
-             return $ List [Atom "js", String x]
+             return $ List [fromSimple (Atom "js"), fromSimple (String x)]
 
 parseExpr :: Parser LispVal
 parseExpr = parseComments
@@ -265,6 +291,10 @@ parseExpr = parseComments
         <|> parseUnquoted
         <|> parseChar
         <|> try parseJs
+        <|> do _ <- try $ string "#{"
+               x <- try parseHashMap
+               _ <- char '}'
+               return x
         <|> do _ <- char '('
                x <- try parseList <|> parseDottedList
                _ <- char ')'
@@ -273,13 +303,13 @@ parseExpr = parseComments
         <|> do _ <- char '['
                x <- parseList
                _ <- char ']'
-               return $ List [Atom "quote", x]
+               return $ List [fromSimple (Atom "quote"), x]
         <|> try parseAtom
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser input input of
-    Left err -> throwError $ ParseErr err
-    Right val -> return val
+      Left err -> throwError $ ParseErr err
+      Right val -> return $ val
 
 -- | read a single expression
 readExpr :: String -> ThrowsError LispVal
@@ -287,4 +317,11 @@ readExpr = readOrThrow parseExpr
 
 -- | read a list of expressions
 readExprList :: String -> ThrowsError [LispVal]
-readExprList s = readOrThrow (endBy parseExpr spaces) $ s ++ " "
+readExprList s = do x <- readOrThrow (endBy parseExpr spaces) (trim s)
+                    return $ trimNil [] x
+    where trim (x:xs) | isSpace x = trim xs
+                      | otherwise = x:xs
+          trim x = x
+          trimNil acc [] = acc
+          trimNil acc (SimpleVal (Nil _) : xs) = trimNil acc xs
+          trimNil acc (x : xs) = trimNil (acc ++ [x]) xs

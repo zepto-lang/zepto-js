@@ -20,7 +20,7 @@ Zepto.prototype.waitForChange = function(c) { if(this.changed) c(); else this.wa
 
 Zepto.prototype.getEditorContents = function() {
   this.changed = false
-  return this.editor.getSession().getValue();
+  return this.editor.getSession().getValue() + "\n";
 };
 
 Zepto.prototype.write = function(text) {
