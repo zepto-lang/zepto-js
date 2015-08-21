@@ -16,6 +16,9 @@ function Zepto(editor, res, dbg, stdlib) {
 
 Zepto.prototype.getStdlib = function() { return this.stdlib; }
 
+Zepto.prototype.enableEditor = function() { this.editor.setReadOnly(false); }
+
+
 Zepto.prototype.waitForChange = function(c) { if(this.changed) c(); else this.waiting.push(c); };
 
 Zepto.prototype.getEditorContents = function() {

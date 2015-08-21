@@ -15,7 +15,6 @@ import System.IO
 import System.IO.Error (tryIOError)
 import qualified Data.Map
 
-import Paths_zepto
 import Zepto.Primitives.CharStrPrimitives
 import Zepto.Primitives.ConversionPrimitives
 import Zepto.Primitives.HashPrimitives
@@ -252,11 +251,8 @@ evalCallCC _ = throwError $ NumArgs 1 []
 
 findFile' :: String -> ExceptT LispError IO String
 findFile' filename = do
-        fileAsLib <- liftIO $ getDataFileName $ "zepto-stdlib/" ++ filename
         exists <- fex filename
-        existsLib <- fex fileAsLib
-        case (exists, existsLib) of
-            (Bool False, Bool True) -> return fileAsLib
+        case exists of
             _ -> return filename
     where
         fex file = do ex <-liftIO $ doesFileExist file

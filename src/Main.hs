@@ -57,7 +57,7 @@ main = do
           stdSrc <- [js| zepto.getStdlib() |]
           env <- primitiveBindings
           putStrLn =<< evaluation env stdSrc
-          [js_| console.log('stdlib compiled!'); |]
+          [js_| console.log('stdlib compiled!'); zepto.enableEditor(); |]
           forever $ do
             [jsi_| zepto.waitForChange($c); |]
             threadDelay 500000
