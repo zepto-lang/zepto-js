@@ -1,7 +1,7 @@
 Name:                zepto-js
 Version:             0.2.0
 Synopsis:            R5RS and beyond Interpreter and REPL.
-Description:         
+Description:
   zepto-js is a Javascript port of zepto using GHCJS.
   .
   zepto is a relaxed implementation of the R<sup>5</sup>RS standard.
@@ -20,7 +20,7 @@ License:             GPL
 License-file:        LICENSE
 Author:              Veit Heller <veitheller.de>
 Maintainer:          Veit Heller <github.com/hellerve>
-Bug-Reports:         http://github.com/zepto-lang/zepto/issues
+Bug-Reports:         http://github.com/zepto-lang/zepto-js/issues
 Build-Type:          Simple
 Category:            Compilers/Interpreters, Language
 Tested-with:         GHC == 7.10.1,
@@ -35,7 +35,7 @@ Cabal-Version:       >= 1.2
 
 Source-Repository head
     Type:            git
-    Location:        git://github.com/zepto-lang/zepto.git
+    Location:        git://github.com/zepto-lang/zepto-js.git
 
 Executable           zepto-js
     js-sources:      jsbits/zepto.js
