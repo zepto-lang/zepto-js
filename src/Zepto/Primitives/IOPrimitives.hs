@@ -39,8 +39,11 @@ colorProc [SimpleVal (Atom (':' : s))] =
 colorProc [badArg] = throwError $ TypeMismatch "atom" badArg
 colorProc badArgs = throwError $ NumArgs 1 badArgs
 
+ffi :: String -> String
+ffi input = [js'| "" + eval(`input) |]
+
 jsProc :: [LispVal] -> IOThrowsError LispVal
-jsProc [SimpleVal (String s)] = (liftIO [js_| eval(`s); |]) >> return (SimpleVal (Bool True))
+jsProc [SimpleVal (String s)] = return $ SimpleVal $ String $ ffi s
 jsProc [badArg] = throwError $ TypeMismatch "string" badArg
 jsProc badArgs = throwError $ NumArgs 1 badArgs
 
