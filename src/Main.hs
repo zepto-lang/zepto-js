@@ -50,20 +50,13 @@ primitiveBindings = nullEnv >>= flip extendEnv (fmap (makeFunc IOFunc) ioPrimiti
 -- |Parses arguments and runs the REPL
 main :: IO ()
 main = do
-          [js_| zeptoInit(); |]
           printVersion
           printCopyright
           [js_| console.log('Compiling stdlib...'); |]
-          stdSrc <- [js| zepto.getStdlib() |]
+          stdSrc <- [js| zepto.stdlib |]
           env <- primitiveBindings
           putStrLn =<< evaluation env stdSrc
-          [js_| console.log('stdlib compiled!'); zepto.enableEditor(); |]
-          forever $ do
-            [jsi_| zepto.waitForChange($c); |]
-            threadDelay 500000
-            a <- [js| zepto.getEditorContents() |]
-            x <- evaluation env a
-            [js_| zepto.write(`x); |]
+          [js_| zepto.registerFun(`evaluation, `env);|]
     where
       evaluation env x = catch (evalStrings env x) handler
       handler msg@(SomeException _) = return $ "Caught error: " ++ show (msg::SomeException)

@@ -1,44 +1,40 @@
-function Zepto(editor, res, dbg, stdlib) {
-  this.changed = true;
-  this.waiting = [];
-  this.code = null;
-  this.result = document.getElementById(res);
-  this.dbg = document.getElementById(dbg);
-  this.stdlib = document.getElementById(stdlib).stdlibData;
-  this.editor = editor;
-  var that = this;
-  editor.getSession().on("change", function() {
-    that.changed = true;
-    var x;
-    while(x = that.waiting.pop()) x();
+'use strict'
+
+let zepto = {};
+zepto.stdlib = null;
+zepto.stdout = console.log;
+zepto.stderr = console.err;
+zepto.observer = new MutationObserver(zepto.handleMutation);
+
+zepto.registerFun = function(evaluator, env) {
+  this.evaluator = evaluator;
+  this.env = env;
+}
+
+zepto.eval = function(input) {
+  if (!this.evaluator || this.env) {
+    throw new Error("zepto is not ready yet.");
+  }
+  return this.evaluator(this.env, input);
+}
+
+zepto.handleMutation = function(mutations) {
+  mutations.forEach(mutation => {
+    nodes = Array.slice.call([], mutation.addedNodes);
+    nodes.map(zepto.handleDom);
   });
 }
 
-Zepto.prototype.getStdlib = function() { return this.stdlib; }
-
-Zepto.prototype.enableEditor = function() { this.editor.setReadOnly(false); }
-
-
-Zepto.prototype.waitForChange = function(c) { if(this.changed) c(); else this.waiting.push(c); };
-
-Zepto.prototype.getEditorContents = function() {
-  this.changed = false
-  return this.editor.getSession().getValue() + "\n";
-};
-
-Zepto.prototype.write = function(text) {
-  this.result.value = text;
+zepto.handleDom(node) {
+  if (node.nodeName != "SCRIPT" || node.type != "text/zepto")
+    return null;
+  return zepto.eval(node.innerHTML);
 }
 
-Zepto.prototype.writeDbg = function(text) {
-  this.dbg.value +=  "\n" + text;
+window.onload = function() {
+  let scripts = document.getElementsByTagName("script");
+  scripts = Array.slice.call([], scripts);
+  scripts.map(zepto.handleDom);
 }
 
-var zepto;
-function zeptoInit() {
-  zepto = new Zepto(editor, 'result', 'dbg', 'stdlib');
-  console.log = function (message) {
-    zepto.writeDbg(message);
-  };
-}
-
+zepto.observer.observe(document, {childList: true, subtree: true});
